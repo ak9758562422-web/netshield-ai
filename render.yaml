@@ -10,3 +10,7 @@ services:
     envVars:
       - key: CORS_ORIGINS
         value: https://netshield-ai-six.vercel.app,https://netshield-ai-abhi-669c.vercel.app
+      - key: MODEL_DRIVE_ID
+        sync: false
+      - key: PREPROCESS_DRIVE_ID
+        sync: false
