@@ -3,6 +3,7 @@ import os
 from typing import Any
 
 import joblib
+import gdown
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -12,6 +13,8 @@ from tensorflow.keras.applications.vgg19 import preprocess_input
 
 MODEL_PATH = os.getenv("MODEL_PATH", "vgg19_dos_detection.keras")
 PREPROCESS_PATH = os.getenv("PREPROCESS_PATH", "vgg19_dos_preprocessing.joblib")
+MODEL_DRIVE_ID = os.getenv("MODEL_DRIVE_ID", "").strip()
+PREPROCESS_DRIVE_ID = os.getenv("PREPROCESS_DRIVE_ID", "").strip()
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 MAX_ROWS = 50_000
 BATCH_SIZE = 64
@@ -37,13 +40,29 @@ model = None
 artifacts: dict[str, Any] | None = None
 
 
+def ensure_artifact(path: str, drive_id: str, label: str) -> None:
+    """Download a missing model artifact from a Google Drive file ID."""
+    if os.path.isfile(path) and os.path.getsize(path) > 0:
+        return
+    if not drive_id:
+        raise RuntimeError(
+            f"{label} file is missing ({path}). Configure its Google Drive ID "
+            "in the Render environment."
+        )
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    downloaded = gdown.download(id=drive_id, output=path, quiet=False, fuzzy=True)
+    if not downloaded or not os.path.isfile(path) or os.path.getsize(path) == 0:
+        raise RuntimeError(
+            f"Could not download {label} from Google Drive. Check that sharing is "
+            "'Anyone with the link' and that the file ID is correct."
+        )
+
+
 @app.on_event("startup")
 def load_artifacts() -> None:
     global model, artifacts
-    if not os.path.isfile(MODEL_PATH):
-        raise RuntimeError(f"Model file not found: {MODEL_PATH}")
-    if not os.path.isfile(PREPROCESS_PATH):
-        raise RuntimeError(f"Preprocessing artifact not found: {PREPROCESS_PATH}")
+    ensure_artifact(MODEL_PATH, MODEL_DRIVE_ID, "VGG19 model")
+    ensure_artifact(PREPROCESS_PATH, PREPROCESS_DRIVE_ID, "preprocessing artifact")
     artifacts = joblib.load(PREPROCESS_PATH)
     model = tf.keras.models.load_model(MODEL_PATH, compile=False)
 
